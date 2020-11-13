@@ -52,7 +52,7 @@ func (r EventResponse) Errored() bool {
 	return len(r.Error) != 0
 }
 
-// NewEvent retuns a new event which can be used for publishing
+// NewEvent returns a new event which can be used for publishing
 // the obj gets automatically serialized in json.
 func NewEvent(name EventType, obj interface{}) (*Event, error) {
 	dat, err := json.Marshal(obj)
