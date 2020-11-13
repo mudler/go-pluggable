@@ -177,5 +177,38 @@ var _ = Describe("Plugin", func() {
 			Expect(resp.Errored()).ToNot(BeTrue())
 			Expect(received).Should(Equal(foo))
 		})
+
+		It("is concurrent safe", func() {
+			d1 := []byte("#!/bin/bash\necho $2\n")
+			err := ioutil.WriteFile(pluginFile.Name(), d1, 0550)
+			Expect(err).Should(BeNil())
+
+			m.Plugins = []Plugin{{Name: "test", Executable: pluginFile.Name()}}
+			m.Events = []EventType{PackageInstalled}
+			m.Subscribe(b)
+
+			foo := map[string]string{"foo": "bar"}
+			ev, err := NewEvent(PackageInstalled, foo)
+			Expect(err).Should(BeNil())
+
+			var received map[string]string
+			var resp *EventResponse
+			b.Listen("test", func(r *EventResponse) {
+				resp = r
+				r.Unmarshal(&received)
+			})
+
+			go b.Publish(ev)
+			go b.Publish(ev)
+			go b.Publish(ev)
+			go b.Publish(ev)
+
+			Eventually(func() map[string]string {
+				return received
+			}).Should(Equal(foo))
+
+			Expect(resp.Errored()).ToNot(BeTrue())
+		})
+
 	})
 })
