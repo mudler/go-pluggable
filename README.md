@@ -1,6 +1,6 @@
-# [![PkgGoDev](https://pkg.go.dev/badge/github.com/mudler/go-pluggable)](https://pkg.go.dev/github.com/mudler/go-pluggable) [![Go Report Card](https://goreportcard.com/badge/github.com/mudler/go-pluggable)](https://goreportcard.com/report/github.com/mudler/go-pluggable) [![Test](https://github.com/mudler/go-pluggable/workflows/Test/badge.svg)](https://github.com/mudler/go-pluggable/actions?query=workflow%3ATest)  go-pluggable
+# [![PkgGoDev](https://pkg.go.dev/badge/github.com/mudler/go-pluggable)](https://pkg.go.dev/github.com/mudler/go-pluggable) [![Go Report Card](https://goreportcard.com/badge/github.com/mudler/go-pluggable)](https://goreportcard.com/report/github.com/mudler/go-pluggable) [![Test](https://github.com/mudler/go-pluggable/workflows/Test/badge.svg)](https://github.com/mudler/go-pluggable/actions?query=workflow%3ATest) :bento: go-pluggable
 
-light Bus-event driven plugin library for Golang.
+:bento: *go-pluggable* is a light Bus-event driven plugin library for Golang.
 
 `go-pluggable` implements the event/sub pattern to extend your Golang project with external binary plugins that can be written in any language.
 
