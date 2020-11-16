@@ -27,6 +27,9 @@ func main() {
 
     // ...
     m.Publish(myEv,  map[string]string{"foo": "bar"}) // test-foo, will receive our data as json payload
+
+    // If you want the result:
+    m.Publish(myEv,  map[string]string{"foo": "bar"},func(p *pluggable.Plugin, r *pluggable.EventResponse) { ... }) // test-foo, will receive our data as json payload
 }
 
 ```

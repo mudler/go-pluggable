@@ -15,7 +15,10 @@
 
 package pluggable
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 // EventType describes an event type
 type EventType string
@@ -40,6 +43,10 @@ type EventResponse struct {
 func (e Event) JSON() (string, error) {
 	dat, err := json.Marshal(e)
 	return string(dat), err
+}
+
+func (e Event) ResponseEventName(s string) EventType {
+	return EventType(fmt.Sprintf("%s-%s", e.Name, s))
 }
 
 // Unmarshal decodes the json payload in the given parameteer

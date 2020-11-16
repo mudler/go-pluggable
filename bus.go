@@ -45,9 +45,13 @@ func (a *Bus) Listen(event EventType, listener interface{}) *Bus {
 	return a
 }
 
-// Publish publishes an event, it does accept only the event as argument, since
-// the callback will have access to the service mapped by the injector
-func (a *Bus) Publish(e *Event) *Bus {
+// Publish publishes an event, it does accept the event as argument, since
+// the callback will have access to the service mapped by the injector.
+// It accepts optionally a list of functions that are called with the plugin result
+func (a *Bus) Publish(e *Event, listener ...interface{}) *Bus {
+	for _, l := range listener {
+		a.Listen(e.ResponseEventName("results"), l)
+	}
 	a.Lock()
 	defer a.Unlock()
 	a.Map(e)
@@ -68,6 +72,7 @@ func (a *Bus) propagateEvent(p Plugin) func(e *Event) {
 	return func(e *Event) {
 		resp, _ := p.Run(*e)
 		a.Map(&resp)
-		a.Emit(p.Name)
+		a.Map(&p)
+		a.Emit(string(e.ResponseEventName("results")))
 	}
 }

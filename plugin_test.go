@@ -33,6 +33,9 @@ var (
 var _ = Describe("Plugin", func() {
 	Context("event subscription", func() {
 		var pluginFile *os.File
+
+		var pluginFile2 *os.File
+
 		var err error
 		var b *Bus
 		var m *Manager
@@ -41,6 +44,9 @@ var _ = Describe("Plugin", func() {
 			pluginFile, err = ioutil.TempFile(os.TempDir(), "tests")
 			Expect(err).Should(BeNil())
 			defer os.Remove(pluginFile.Name()) // clean up
+			pluginFile2, err = ioutil.TempFile(os.TempDir(), "tests")
+			Expect(err).Should(BeNil())
+			defer os.Remove(pluginFile2.Name()) // clean up
 			b = NewBus()
 			m = &Manager{}
 		})
@@ -62,12 +68,13 @@ var _ = Describe("Plugin", func() {
 
 			var received map[string]string
 			var resp *EventResponse
-			b.Listen("foo", func(r *EventResponse) {
-				resp = r
-				r.Unmarshal(&received)
-			})
 
-			b.Publish(ev)
+			b.Publish(ev,
+				func(r *EventResponse) {
+					resp = r
+					r.Unmarshal(&received)
+				})
+
 			Expect(resp).ToNot(BeNil())
 			Expect(resp.Errored()).ToNot(BeTrue())
 			Expect(resp.State).Should(Equal(string(PackageInstalled)))
@@ -89,12 +96,10 @@ var _ = Describe("Plugin", func() {
 
 				var received map[string]string
 				var resp *EventResponse
-				b.Listen("foo", func(r *EventResponse) {
+				m.Publish(PackageInstalled, map[string]string{"foo": "bar"}, func(r *EventResponse) {
 					resp = r
 					r.Unmarshal(&received)
 				})
-
-				m.Publish(PackageInstalled, map[string]string{"foo": "bar"})
 				Expect(resp).ToNot(BeNil())
 				Expect(resp.Errored()).ToNot(BeTrue())
 				Expect(resp.State).Should(Equal(string(PackageInstalled)))
@@ -118,12 +123,12 @@ var _ = Describe("Plugin", func() {
 
 			var received map[string]string
 			var resp *EventResponse
-			b.Listen("test-foo", func(r *EventResponse) {
+
+			b.Publish(ev, func(r *EventResponse) {
 				resp = r
 				r.Unmarshal(&received)
 			})
 
-			b.Publish(ev)
 			Expect(resp).ToNot(BeNil())
 			Expect(resp.Errored()).ToNot(BeTrue())
 			Expect(resp.State).Should(Equal(string(PackageInstalled)))
@@ -143,12 +148,11 @@ var _ = Describe("Plugin", func() {
 
 			var received map[string]string
 			var resp *EventResponse
-			b.Listen("test", func(r *EventResponse) {
+
+			b.Publish(ev, func(r *EventResponse) {
 				resp = r
 				r.Unmarshal(&received)
 			})
-
-			b.Publish(ev)
 			Expect(resp.Errored()).ToNot(BeTrue())
 			Expect(resp.State).Should(Equal(string(PackageInstalled)))
 		})
@@ -168,16 +172,81 @@ var _ = Describe("Plugin", func() {
 
 			var received map[string]string
 			var resp *EventResponse
-			b.Listen("test", func(r *EventResponse) {
+
+			b.Publish(ev, func(r *EventResponse) {
 				resp = r
 				r.Unmarshal(&received)
 			})
-
-			b.Publish(ev)
 			Expect(resp.Errored()).ToNot(BeTrue())
 			Expect(received).Should(Equal(foo))
 		})
 
+		It("gets the plugin", func() {
+			d1 := []byte("#!/bin/bash\necho $2\n")
+			err := ioutil.WriteFile(pluginFile.Name(), d1, 0550)
+			Expect(err).Should(BeNil())
+
+			m.Plugins = []Plugin{{Name: "test", Executable: pluginFile.Name()}}
+			m.Events = []EventType{PackageInstalled}
+			m.Subscribe(b)
+
+			foo := map[string]string{"foo": "bar"}
+			ev, err := NewEvent(PackageInstalled, foo)
+			Expect(err).Should(BeNil())
+
+			var received map[string]string
+			var receivedPlugin *Plugin
+			var resp *EventResponse
+
+			b.Publish(ev, func(p *Plugin, r *EventResponse) {
+				resp = r
+				receivedPlugin = p
+				r.Unmarshal(&received)
+			})
+			Expect(resp.Errored()).ToNot(BeTrue())
+			Expect(received).Should(Equal(foo))
+			Expect(receivedPlugin.Name).Should(Equal("test"))
+		})
+
+		It("gets multiple plugin responses", func() {
+			d1 := []byte("#!/bin/bash\necho $2\n")
+			err := ioutil.WriteFile(pluginFile.Name(), d1, 0550)
+			Expect(err).Should(BeNil())
+			err = ioutil.WriteFile(pluginFile2.Name(), d1, 0550)
+			Expect(err).Should(BeNil())
+
+			m.Plugins = []Plugin{{Name: "test", Executable: pluginFile.Name()},
+				{Name: "test2", Executable: pluginFile2.Name()}}
+			m.Events = []EventType{PackageInstalled}
+			m.Subscribe(b)
+
+			foo := map[string]string{"foo": "bar"}
+			ev, err := NewEvent(PackageInstalled, foo)
+			Expect(err).Should(BeNil())
+
+			var received []map[string]string
+			var receivedPlugin []*Plugin
+			var resp []*EventResponse
+
+			b.Publish(ev, func(p *Plugin, r *EventResponse) {
+				resp = append(resp, r)
+				receivedPlugin = append(receivedPlugin, p)
+				var rec map[string]string
+				r.Unmarshal(&rec)
+				received = append(received, rec)
+			})
+
+			Expect(len(resp)).To(Equal(2))
+
+			for _, r := range resp {
+				Expect(r.Errored()).ToNot(BeTrue())
+			}
+			for _, r := range received {
+				Expect(r).Should(Equal(foo))
+			}
+			Expect(receivedPlugin).To(ContainElement(&Plugin{Name: "test2", Executable: pluginFile2.Name()}))
+			Expect(receivedPlugin).To(ContainElement(&Plugin{Name: "test", Executable: pluginFile.Name()}))
+		})
 		It("is concurrent safe", func() {
 			d1 := []byte("#!/bin/bash\necho $2\n")
 			err := ioutil.WriteFile(pluginFile.Name(), d1, 0550)
@@ -193,7 +262,7 @@ var _ = Describe("Plugin", func() {
 
 			var received map[string]string
 			var resp *EventResponse
-			b.Listen("test", func(r *EventResponse) {
+			b.Listen(ev.ResponseEventName("results"), func(r *EventResponse) {
 				resp = r
 				r.Unmarshal(&received)
 			})
