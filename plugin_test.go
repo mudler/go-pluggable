@@ -19,6 +19,8 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sync"
+	"time"
 
 	. "github.com/mudler/go-pluggable"
 
@@ -37,7 +39,6 @@ var _ = Describe("Plugin", func() {
 		var pluginFile2 *os.File
 
 		var err error
-		var b *Bus
 		var m *Manager
 
 		BeforeEach(func() {
@@ -47,8 +48,7 @@ var _ = Describe("Plugin", func() {
 			pluginFile2, err = ioutil.TempFile(os.TempDir(), "tests")
 			Expect(err).Should(BeNil())
 			defer os.Remove(pluginFile2.Name()) // clean up
-			b = NewBus()
-			m = &Manager{}
+			m = NewManager([]EventType{})
 		})
 
 		It("autoload plugins", func() {
@@ -61,49 +61,20 @@ var _ = Describe("Plugin", func() {
 
 			m.Autoload("test", temp)
 			m.Events = []EventType{PackageInstalled}
-			m.Subscribe(b)
-
-			ev, err := NewEvent(PackageInstalled, map[string]string{"foo": "bar"})
-			Expect(err).Should(BeNil())
+			m.Register()
 
 			var received map[string]string
 			var resp *EventResponse
 
-			b.Publish(ev,
-				func(r *EventResponse) {
-					resp = r
-					r.Unmarshal(&received)
-				})
+			m.Response(PackageInstalled, func(p *Plugin, r *EventResponse) {
+				resp = r
+				r.Unmarshal(&received)
+			})
+			m.Publish(PackageInstalled, map[string]string{"foo": "bar"})
 
 			Expect(resp).ToNot(BeNil())
 			Expect(resp.Errored()).ToNot(BeTrue())
 			Expect(resp.State).Should(Equal(string(PackageInstalled)))
-		})
-
-		When("using manager publish", func() {
-			It("propagates events", func() {
-				temp, err := ioutil.TempDir(os.TempDir(), "autoload")
-				Expect(err).Should(BeNil())
-
-				d1 := []byte("#!/bin/bash\necho \"{ \\\"state\\\": \\\"$1\\\" }\"\n")
-				err = ioutil.WriteFile(filepath.Join(temp, "test-foo"), d1, 0550)
-				Expect(err).Should(BeNil())
-
-				m.Autoload("test", temp)
-				m.Events = []EventType{PackageInstalled}
-				m.Bus = b
-				m.Register()
-
-				var received map[string]string
-				var resp *EventResponse
-				m.Publish(PackageInstalled, map[string]string{"foo": "bar"}, func(r *EventResponse) {
-					resp = r
-					r.Unmarshal(&received)
-				})
-				Expect(resp).ToNot(BeNil())
-				Expect(resp.Errored()).ToNot(BeTrue())
-				Expect(resp.State).Should(Equal(string(PackageInstalled)))
-			})
 		})
 
 		It("loads plugins", func() {
@@ -116,18 +87,16 @@ var _ = Describe("Plugin", func() {
 			os.Setenv("PATH", os.Getenv("PATH")+":"+temp)
 			m.Load("test-foo")
 			m.Events = []EventType{PackageInstalled}
-			m.Subscribe(b)
-
-			ev, err := NewEvent(PackageInstalled, map[string]string{"foo": "bar"})
-			Expect(err).Should(BeNil())
+			m.Register()
 
 			var received map[string]string
 			var resp *EventResponse
 
-			b.Publish(ev, func(r *EventResponse) {
+			m.Response(PackageInstalled, func(p *Plugin, r *EventResponse) {
 				resp = r
 				r.Unmarshal(&received)
 			})
+			m.Publish(PackageInstalled, map[string]string{"foo": "bar"})
 
 			Expect(resp).ToNot(BeNil())
 			Expect(resp.Errored()).ToNot(BeTrue())
@@ -141,18 +110,17 @@ var _ = Describe("Plugin", func() {
 
 			m.Plugins = []Plugin{{Name: "test", Executable: pluginFile.Name()}}
 			m.Events = []EventType{PackageInstalled}
-			m.Subscribe(b)
-
-			ev, err := NewEvent(PackageInstalled, map[string]string{"foo": "bar"})
-			Expect(err).Should(BeNil())
+			m.Register()
 
 			var received map[string]string
 			var resp *EventResponse
 
-			b.Publish(ev, func(r *EventResponse) {
+			m.Response(PackageInstalled, func(p *Plugin, r *EventResponse) {
 				resp = r
 				r.Unmarshal(&received)
 			})
+			m.Publish(PackageInstalled, map[string]string{"foo": "bar"})
+
 			Expect(resp.Errored()).ToNot(BeTrue())
 			Expect(resp.State).Should(Equal(string(PackageInstalled)))
 		})
@@ -164,19 +132,18 @@ var _ = Describe("Plugin", func() {
 
 			m.Plugins = []Plugin{{Name: "test", Executable: pluginFile.Name()}}
 			m.Events = []EventType{PackageInstalled}
-			m.Subscribe(b)
 
 			foo := map[string]string{"foo": "bar"}
-			ev, err := NewEvent(PackageInstalled, foo)
-			Expect(err).Should(BeNil())
+			m.Register()
 
 			var received map[string]string
 			var resp *EventResponse
 
-			b.Publish(ev, func(r *EventResponse) {
+			m.Response(PackageInstalled, func(p *Plugin, r *EventResponse) {
 				resp = r
 				r.Unmarshal(&received)
 			})
+			m.Publish(PackageInstalled, foo)
 			Expect(resp.Errored()).ToNot(BeTrue())
 			Expect(received).Should(Equal(foo))
 		})
@@ -188,21 +155,19 @@ var _ = Describe("Plugin", func() {
 
 			m.Plugins = []Plugin{{Name: "test", Executable: pluginFile.Name()}}
 			m.Events = []EventType{PackageInstalled}
-			m.Subscribe(b)
+			m.Register()
 
 			foo := map[string]string{"foo": "bar"}
-			ev, err := NewEvent(PackageInstalled, foo)
-			Expect(err).Should(BeNil())
 
 			var received map[string]string
 			var receivedPlugin *Plugin
 			var resp *EventResponse
-
-			b.Publish(ev, func(p *Plugin, r *EventResponse) {
+			m.Response(PackageInstalled, func(p *Plugin, r *EventResponse) {
 				resp = r
 				receivedPlugin = p
 				r.Unmarshal(&received)
 			})
+			m.Publish(PackageInstalled, foo)
 			Expect(resp.Errored()).ToNot(BeTrue())
 			Expect(received).Should(Equal(foo))
 			Expect(receivedPlugin.Name).Should(Equal("test"))
@@ -218,25 +183,32 @@ var _ = Describe("Plugin", func() {
 			m.Plugins = []Plugin{{Name: "test", Executable: pluginFile.Name()},
 				{Name: "test2", Executable: pluginFile2.Name()}}
 			m.Events = []EventType{PackageInstalled}
-			m.Subscribe(b)
+			m.Register()
 
 			foo := map[string]string{"foo": "bar"}
-			ev, err := NewEvent(PackageInstalled, foo)
-			Expect(err).Should(BeNil())
 
 			var received []map[string]string
 			var receivedPlugin []*Plugin
-			var resp []*EventResponse
+			var resp []EventResponse
+			mu := sync.Mutex{}
 
-			b.Publish(ev, func(p *Plugin, r *EventResponse) {
-				resp = append(resp, r)
+			f := func(p *Plugin, r *EventResponse) {
+				mu.Lock()
+				defer mu.Unlock()
+				resp = append(resp, *r)
 				receivedPlugin = append(receivedPlugin, p)
 				var rec map[string]string
 				r.Unmarshal(&rec)
 				received = append(received, rec)
-			})
+			}
+			m.Response(PackageInstalled, f)
+			m.Publish(PackageInstalled, foo)
 
-			Expect(len(resp)).To(Equal(2))
+			Eventually(func() int {
+				mu.Lock()
+				defer mu.Unlock()
+				return len(resp)
+			}, 100*time.Second).Should(Equal(2))
 
 			for _, r := range resp {
 				Expect(r.Errored()).ToNot(BeTrue())
@@ -254,30 +226,36 @@ var _ = Describe("Plugin", func() {
 
 			m.Plugins = []Plugin{{Name: "test", Executable: pluginFile.Name()}}
 			m.Events = []EventType{PackageInstalled}
-			m.Subscribe(b)
+			m.Register()
 
 			foo := map[string]string{"foo": "bar"}
-			ev, err := NewEvent(PackageInstalled, foo)
-			Expect(err).Should(BeNil())
-
 			var received map[string]string
 			var resp *EventResponse
-			b.Listen(ev.ResponseEventName("results"), func(r *EventResponse) {
+			mu := sync.Mutex{}
+			f := func(p *Plugin, r *EventResponse) {
+				mu.Lock()
 				resp = r
 				r.Unmarshal(&received)
-			})
-
-			go b.Publish(ev)
-			go b.Publish(ev)
-			go b.Publish(ev)
-			go b.Publish(ev)
+				mu.Unlock()
+			}
+			m.Response(PackageInstalled, f)
+			go m.Publish(PackageInstalled, foo)
+			go m.Publish(PackageInstalled, foo)
+			go m.Publish(PackageInstalled, foo)
+			go m.Publish(PackageInstalled, foo)
 
 			Eventually(func() map[string]string {
+
+				mu.Lock()
+				defer mu.Unlock()
 				return received
 			}).Should(Equal(foo))
 
-			Expect(resp.Errored()).ToNot(BeTrue())
-		})
+			mu.Lock()
 
+			Expect(resp.Errored()).ToNot(BeTrue())
+
+			mu.Unlock()
+		})
 	})
 })

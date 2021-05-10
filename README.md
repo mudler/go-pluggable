@@ -25,11 +25,24 @@ func main() {
     m.Autoload("test", temp)
     m.Register()
 
-    // ...
-    m.Publish(myEv,  map[string]string{"foo": "bar"}) // test-foo, will receive our data as json payload
+    // Optionally process plugin results response
+    // The plugins has to return as output a json in stdout in the format { 'state': "somestate", data: "some data", error: "some error" }
+    // e.g. with jq:  
+    // jq --arg key0   'state' \
+    // --arg value0 '' \
+    // --arg key1   'data' \
+    // --arg value1 "" \
+    // --arg key2   'error' \
+    // --arg value2 '' \
+    // '. | .[$key0]=$value0 | .[$key1]=$value1 | .[$key2]=$value2' \
+    // <<<'{}'
+    m.Response(myEv, func(p *pluggable.Plugin, r *pluggable.EventResponse) { ... }) 
 
-    // If you want the result:
-    m.Publish(myEv,  map[string]string{"foo": "bar"},func(p *pluggable.Plugin, r *pluggable.EventResponse) { ... }) // test-foo, will receive our data as json payload
+    // Emit events, they are encoded and passed as JSON payloads to the plugins.
+    // In our case, test-foo will receive the map as JSON
+    m.Publish(myEv,  map[string]string{"foo": "bar"})
+
+
 }
 
 ```
