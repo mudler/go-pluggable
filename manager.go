@@ -57,9 +57,8 @@ func (m *Manager) Publish(event EventType, obj interface{}) (*Manager, error) {
 	return m, err
 }
 
-// Publish publishes an event, it does accept the event as argument, since
-// the callback will have access to the service mapped by the injector.
-// It accepts optionally a list of functions that are called with the plugin result
+// Response binds a set of listeners to an event type. The listeners are called for each result from
+// every plugin when Publish is called.
 func (m *Manager) Response(event EventType, listener ...func(p *Plugin, r *EventResponse)) *Manager {
 	ev, _ := NewEvent(event, nil)
 	for _, l := range listener {
