@@ -16,7 +16,9 @@
 package pluggable_test
 
 import (
+	"encoding/base64"
 	"io/ioutil"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"sync"
@@ -257,5 +259,71 @@ var _ = Describe("Plugin", func() {
 
 			mu.Unlock()
 		})
+
+		It("Writes the data to a file when it's too big", func() {
+			d1 := []byte(`#!/bin/bash
+echo "{ \"data\": \"$(echo $2 | base64 -w0)\" }"`)
+			err := ioutil.WriteFile(pluginFile.Name(), d1, 0550)
+			Expect(err).Should(BeNil())
+
+			m.Plugins = []Plugin{{Name: "test", Executable: pluginFile.Name()}}
+			m.Events = []EventType{PackageInstalled}
+			m.Register()
+
+			foo := map[string]string{"foo": randStringRunes((1 << 13) + 1)}
+
+			var resp *EventResponse
+			m.Response(PackageInstalled, func(p *Plugin, r *EventResponse) {
+				resp = r
+			})
+			m.Publish(PackageInstalled, foo)
+			b, err := base64.StdEncoding.DecodeString(resp.Data)
+
+			Expect(string(b)).To(ContainSubstring("{\"name\":\"package.install\",\"data\":\"\",\"file\":\"/tmp/pluggable"))
+			Expect(err).Should(BeNil())
+
+		})
+
+		It("The file that is written has the event content", func() {
+			d1 := []byte(`#!/bin/bash
+			data="$(cat $(echo $2 | jq -r .file))"
+			jq --arg key0   'data' \
+			   --arg value0 "$data" \
+				'. | .[$key0]=$value0' \
+				<<<'{}'`)
+			err := ioutil.WriteFile(pluginFile.Name(), d1, 0550)
+			Expect(err).Should(BeNil())
+
+			m.Plugins = []Plugin{{Name: "test", Executable: pluginFile.Name()}}
+			m.Events = []EventType{PackageInstalled}
+			m.Register()
+
+			foo := map[string]string{"foo": randStringRunes((1 << 13) + 1)}
+
+			var resp *EventResponse
+			m.Response(PackageInstalled, func(p *Plugin, r *EventResponse) {
+				resp = r
+			})
+			m.Publish(PackageInstalled, foo)
+			res := map[string]string{}
+			err = resp.Unmarshal(&res)
+			Expect(err).Should(BeNil())
+
+			Expect(res["foo"]).ToNot(BeEmpty())
+		})
 	})
 })
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
+
+var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+
+func randStringRunes(n int) string {
+	b := make([]rune, n)
+	for i := range b {
+		b[i] = letterRunes[rand.Intn(len(letterRunes))]
+	}
+	return string(b)
+}
