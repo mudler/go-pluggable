@@ -83,7 +83,7 @@ To note, when the payload exceeds the [threshold size](https://github.com/mudler
 ```bash
 #!/bin/bash
 data_file="$(echo $2 | jq -r .file)"
-if [ "$data_file" != "" ]; then
+if [ -n "${data_file}" ]; then
     payload="$(cat $data_file)"
 
 ...
