@@ -46,7 +46,7 @@ var _ = Describe("PluginFactory", func() {
 
 			Expect(b.String()).ToNot(BeEmpty())
 			resp := &EventResponse{}
-			err = json.Unmarshal([]byte(b.String()), resp)
+			err = json.Unmarshal(b.Bytes(), resp)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(resp.Data).To(Equal("true"))
 		})
