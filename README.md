@@ -20,9 +20,12 @@ func main() {
         },
     )
         
-    // We have a file 'test-foo' in temp.
-    // 'test-foo' will receive our event payload in json
-    m.Autoload("test", temp)
+    // Load plugins
+    m.Autoload("test", temp) // Scan for binary plugins with the "test" prefix. E.g. 'test-foo'
+    m.Plugin = append(m.Plugin, pluggable.Plugin{ Name: "foo" , Executable: "path" }) // manually add a Plugin
+    m.Load("my-binary", "my-binary-2"...) // Load individually, scanning $PATH
+
+    // Register to events and initialize the manager
     m.Register()
 
     // Optionally process plugin results response
@@ -41,8 +44,6 @@ func main() {
     // Emit events, they are encoded and passed as JSON payloads to the plugins.
     // In our case, test-foo will receive the map as JSON
     m.Publish(myEv,  map[string]string{"foo": "bar"})
-
-
 }
 
 ```
@@ -88,4 +89,22 @@ if [ -n "${data_file}" ]; then
 
 ...
 fi
+```
+
+## Writing plugin in golang
+
+It is present a `FactoryPlugin` which allows to create plugins in golang, consider:
+
+```golang
+import "github.com/mudler/go-pluggable"
+
+func main() {
+    var myEv pluggableEventType = "event"
+
+    factory := pluggable.NewPluginFactory()
+    factory.Add(myEv, func(e *Event) EventResponse { return EventResponse{ ... })
+
+    factory.Run(os.Args[1], os.Args[2], os.Stdout)
+}
+
 ```
