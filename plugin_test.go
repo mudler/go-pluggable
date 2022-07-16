@@ -126,7 +126,7 @@ var _ = Describe("Plugin", func() {
 		})
 
 		It("gets the json event payload", func() {
-			d1 := []byte("#!/bin/bash\necho $2\n")
+			d1 := []byte("#!/bin/bash\nless <&0\n")
 			err := ioutil.WriteFile(pluginFile.Name(), d1, 0550)
 			Expect(err).Should(BeNil())
 
@@ -149,7 +149,7 @@ var _ = Describe("Plugin", func() {
 		})
 
 		It("gets the plugin", func() {
-			d1 := []byte("#!/bin/bash\necho $2\n")
+			d1 := []byte("#!/bin/bash\nless <&0\n")
 			err := ioutil.WriteFile(pluginFile.Name(), d1, 0550)
 			Expect(err).Should(BeNil())
 
@@ -174,7 +174,7 @@ var _ = Describe("Plugin", func() {
 		})
 
 		It("gets multiple plugin responses", func() {
-			d1 := []byte("#!/bin/bash\necho $2\n")
+			d1 := []byte("#!/bin/bash\nless <&0\n")
 			err := ioutil.WriteFile(pluginFile.Name(), d1, 0550)
 			Expect(err).Should(BeNil())
 			err = ioutil.WriteFile(pluginFile2.Name(), d1, 0550)
@@ -220,7 +220,7 @@ var _ = Describe("Plugin", func() {
 			Expect(receivedPlugin).To(ContainElement(&Plugin{Name: "test", Executable: pluginFile.Name()}))
 		})
 		It("is concurrent safe", func() {
-			d1 := []byte("#!/bin/bash\necho $2\n")
+			d1 := []byte("#!/bin/bash\nless <&0\n")
 			err := ioutil.WriteFile(pluginFile.Name(), d1, 0550)
 			Expect(err).Should(BeNil())
 
@@ -260,7 +260,7 @@ var _ = Describe("Plugin", func() {
 
 		It("Writes the data to a file when it's too big", func() {
 			d1 := []byte(`#!/bin/bash
-echo "{ \"data\": \"$(echo $2 | base64 -w0)\" }"`)
+echo "{ \"data\": \"$(less <&0 | base64 -w0)\" }"`)
 			err := ioutil.WriteFile(pluginFile.Name(), d1, 0550)
 			Expect(err).Should(BeNil())
 
@@ -284,7 +284,7 @@ echo "{ \"data\": \"$(echo $2 | base64 -w0)\" }"`)
 
 		It("The file that is written has the event content", func() {
 			d1 := []byte(`#!/bin/bash
-			data="$(cat $(echo $2 | jq -r .file))"
+			data="$(cat $(less <&0 | jq -r .file))"
 			jq --arg key0   'data' \
 			   --arg value0 "$data" \
 				'. | .[$key0]=$value0' \

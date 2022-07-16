@@ -39,7 +39,7 @@ var _ = Describe("PluginFactory", func() {
 			payloadDat, err := json.Marshal(payload)
 			Expect(err).ToNot(HaveOccurred())
 			factory.Add("foo", func(e *Event) EventResponse { return EventResponse{State: "foo", Data: fmt.Sprint(e.Data == "bar")} })
-			err = factory.Run("foo", string(payloadDat), b)
+			err = factory.Run("foo", bytes.NewBuffer(payloadDat), b)
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(b.String()).ToNot(BeEmpty())

@@ -99,12 +99,12 @@ It is present a `FactoryPlugin` which allows to create plugins in golang, consid
 import "github.com/mudler/go-pluggable"
 
 func main() {
-    var myEv pluggableEventType = "event"
+    var myEv pluggable.EventType = "event"
 
     factory := pluggable.NewPluginFactory()
-    factory.Add(myEv, func(e *Event) EventResponse { return EventResponse{ ... })
+    factory.Add(myEv, func(e *plugable.Event) pluggable.EventResponse { return EventResponse{ ... })
 
-    factory.Run(os.Args[1], os.Args[2], os.Stdout)
+    factory.Run(os.Args[1], os.Stdin, os.Stdout)
 }
 
 ```

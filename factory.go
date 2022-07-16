@@ -46,10 +46,15 @@ type PluginFactory map[EventType]PluginHandler
 //
 // The result is written to the writer provided
 // as argument.
-func (p PluginFactory) Run(name EventType, payload string, w io.Writer) error {
+func (p PluginFactory) Run(name EventType, r io.Reader, w io.Writer) error {
 	ev := &Event{}
 
-	if err := json.Unmarshal([]byte(payload), ev); err != nil {
+	b, err := io.ReadAll(r)
+	if err != nil {
+		return err
+	}
+
+	if err := json.Unmarshal(b, ev); err != nil {
 		return err
 	}
 

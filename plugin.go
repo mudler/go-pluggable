@@ -57,7 +57,8 @@ func (p Plugin) Run(e Event) (EventResponse, error) {
 	if err != nil {
 		return r, errors.Wrap(err, "while marshalling event")
 	}
-	cmd := exec.Command(p.Executable, string(e.Name), k)
+	cmd := exec.Command(p.Executable, string(e.Name))
+	cmd.Stdin = bytes.NewBuffer([]byte(k))
 	cmd.Env = os.Environ()
 	var b bytes.Buffer
 	cmd.Stderr = &b
