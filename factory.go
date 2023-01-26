@@ -17,6 +17,7 @@ import (
 	"encoding/json"
 	"io"
 	"io/ioutil"
+	"os"
 )
 
 type FactoryPlugin struct {
@@ -65,6 +66,17 @@ func (p PluginFactory) Run(name EventType, r io.Reader, w io.Writer) error {
 		}
 
 		ev.Data = string(c)
+	}
+
+	if w == os.Stdout {
+		old := os.Stdout
+
+		// redirect output to stderr, to not clutter with the writer which expects JSON only
+		os.Stdout = os.Stderr
+
+		defer func() {
+			os.Stdout = old
+		}()
 	}
 
 	resp := EventResponse{}
