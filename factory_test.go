@@ -17,6 +17,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"os"
 
 	. "github.com/mudler/go-pluggable"
 
@@ -38,7 +39,11 @@ var _ = Describe("PluginFactory", func() {
 
 			payloadDat, err := json.Marshal(payload)
 			Expect(err).ToNot(HaveOccurred())
-			factory.Add("foo", func(e *Event) EventResponse { return EventResponse{State: "foo", Data: fmt.Sprint(e.Data == "bar")} })
+			factory.Add("foo", func(e *Event) EventResponse {
+				fmt.Println("logtest")
+				os.Stderr.WriteString("errmessage")
+				return EventResponse{State: "foo", Data: fmt.Sprint(e.Data == "bar")}
+			})
 			err = factory.Run("foo", bytes.NewBuffer(payloadDat), b)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -47,6 +52,7 @@ var _ = Describe("PluginFactory", func() {
 			err = json.Unmarshal(b.Bytes(), resp)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(resp.Data).To(Equal("true"))
+			Expect(resp.Logs).To(Equal("logtest\nerrmessage"))
 		})
 	})
 })

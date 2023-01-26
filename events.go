@@ -36,6 +36,7 @@ type EventResponse struct {
 	State string `json:"state"`
 	Data  string `json:"data"`
 	Error string `json:"error"`
+	Logs  string `json:"log"`
 }
 
 // JSON returns the stringified JSON of the Event

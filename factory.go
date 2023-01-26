@@ -14,6 +14,7 @@ limitations under the License.
 package pluggable
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"io/ioutil"
@@ -68,16 +69,24 @@ func (p PluginFactory) Run(name EventType, r io.Reader, w io.Writer) error {
 		ev.Data = string(c)
 	}
 
-	if w == os.Stdout {
-		old := os.Stdout
+	old := os.Stdout
+	oldErr := os.Stderr
 
-		// redirect output to stderr, to not clutter with the writer which expects JSON only
-		os.Stdout = os.Stderr
-
-		defer func() {
-			os.Stdout = old
-		}()
+	re, ww, err := os.Pipe()
+	if err != nil {
+		return err
 	}
+
+	os.Stdout = ww
+	os.Stderr = ww
+	outC := make(chan string)
+
+	// copy the output in a separate goroutine so printing can't block indefinitely
+	go func() {
+		var buf bytes.Buffer
+		io.Copy(&buf, re)
+		outC <- buf.String()
+	}()
 
 	resp := EventResponse{}
 	for e, r := range p {
@@ -85,6 +94,13 @@ func (p PluginFactory) Run(name EventType, r io.Reader, w io.Writer) error {
 			resp = r(ev)
 		}
 	}
+
+	// restoring the real stdout
+	ww.Close()
+	os.Stdout = old
+	os.Stderr = oldErr
+	out := <-outC
+	resp.Logs = out
 
 	dat, err := json.Marshal(resp)
 	if err != nil {
